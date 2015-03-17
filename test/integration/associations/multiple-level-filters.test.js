@@ -214,4 +214,82 @@ describe(Support.getTestDialectTeaser('Multiple Level Filters'), function() {
       });
     });
   });
+
+
+  it('with offset and limit can filter through hasMany connector', function() {
+    var self = this;
+    var User = this.sequelize.define('User', {
+      id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      username: {
+        type: DataTypes.STRING
+      }
+    });
+
+    var Project = this.sequelize.define('Project', {
+      id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      title: {
+        type: DataTypes.STRING
+      },
+      active: {
+        type: DataTypes.BOOLEAN
+      }
+    });
+
+    var UsersProjects = this.sequelize.define('UsersProjects', {
+
+    });
+
+    User.belongsToMany(Project, {through: UsersProjects});
+    Project.belongsToMany(User, {through: UsersProjects});
+
+    return this.sequelize.sync({ force: true }).then(function() {
+      return self.sequelize.Promise.all([
+        User.create({ username: 'User 1'}),
+        User.create({ username: 'User 2'}),
+        User.create({ username: 'User 3'}),
+        User.create({ username: 'User 4'}),
+        User.create({ username: 'User 5'}),
+        User.create({ username: 'User 6'}),
+        User.create({ username: 'User 7'}),
+        Project.create({ title: 'Project 1', active: true}), // user1
+        Project.create({ title: 'Project 2', active: false}), // user1
+        Project.create({ title: 'Project 3', active: true}), // user1
+        Project.create({ title: 'Project 4', active: true}),// user3
+        Project.create({ title: 'Project 5', active: false}),//user2
+        Project.create({ title: 'Project 6', active: true}),// user4
+        Project.create({ title: 'Project 7', active: true}),// user5
+        Project.create({ title: 'Project 8', active: false}),//user2
+        Project.create({ title: 'Project 9', active: true}),//user6
+        Project.create({ title: 'Project 10', active: false}),//user7
+      ]);
+    }).spread(function(user1, user2, user3, user4, user5, user6, user7,
+                       project1, project2, project3, project4, project5, project6, project7, project8, project9, project10) {
+
+      return self.sequelize.Promise.all([
+        user1.setProjects([project1, project2, project3]), // has active projects
+        user2.setProjects([project5, project8]),
+        user3.setProjects([project4]),// has active projects
+        user4.setProjects([project6]),// has active projects
+        user5.setProjects([project7]),// has active projects
+        user6.setProjects([project9]),// has active projects
+        user7.setProjects([project10]),
+      ]);
+    }).then(function() {
+      return User.findAll({ offset: 0, limit: 2 , include: [ { model: Project, where: { active: true } }] , order: [['id', 'ASC']] });
+    }).then(function(users) {
+      expect(users.length).to.be.equal(2);
+    });
+
+  }); //with offset and limit can filter through hasMany connector
+
 });
